@@ -63,7 +63,9 @@ apt-get install -y python3 python3-pip python3-venv curl wget git sqlite3
 
 # Install Python packages including pandas
 log "🐍 Installing Python packages..."
-pip3 install pandas numpy matplotlib seaborn jupyter
+# Use system packages where possible, pip with --break-system-packages for others
+apt-get install -y python3-pandas python3-numpy python3-matplotlib python3-seaborn python3-jupyter-core python3-ipython || true
+pip3 install --break-system-packages jupyter pandas numpy matplotlib seaborn 2>/dev/null || pip3 install jupyter pandas numpy matplotlib seaborn --user 2>/dev/null || log "⚠️ Pip packages installation failed"
 
 # Create git user for Gitea
 log "� Creating git user for Gitea..."
@@ -417,7 +419,18 @@ sudo -u "$ADMIN_USER" bash -c "
   git config --global user.email '$ADMIN_USER@interview.local'
   git config --global user.name '$ADMIN_USER'
 "
-log "✅ Git configuration completed"
+
+# Setup Python virtual environment for admin user
+log "🐍 Setting up Python virtual environment for $ADMIN_USER..."
+sudo -u "$ADMIN_USER" bash -c "
+  cd /home/$ADMIN_USER
+  python3 -m venv venv
+  source venv/bin/activate
+  pip install pandas numpy matplotlib seaborn jupyter ipython
+  echo 'source ~/venv/bin/activate' >> .bashrc
+"
+
+log "✅ Git configuration and Python environment completed"
 
 # Setup code-server for admin user
 log "💻 Setting up code-server for $ADMIN_USER..."
@@ -475,7 +488,7 @@ EOF
 # Setup code-server workspace settings with dark theme
 log "🎨 Setting up code-server with dark theme and extensions..."
 mkdir -p /home/"$ADMIN_USER"/.local/share/code-server/User
-sudo -u "$ADMIN_USER" tee /home/"$ADMIN_USER"/.local/share/code-server/User/settings.json > /dev/null <<EOF
+cat > /home/"$ADMIN_USER"/.local/share/code-server/User/settings.json <<EOF
 {
     "workbench.colorTheme": "Default Dark+",
     "workbench.preferredDarkColorTheme": "Default Dark+",
@@ -488,7 +501,7 @@ sudo -u "$ADMIN_USER" tee /home/"$ADMIN_USER"/.local/share/code-server/User/sett
     "editor.fontSize": 14,
     "editor.tabSize": 4,
     "editor.insertSpaces": true,
-    "python.defaultInterpreterPath": "/usr/bin/python3",
+    "python.defaultInterpreterPath": "/home/$ADMIN_USER/venv/bin/python",
     "csv-edit.readOption_hasHeader": "true",
     "csv-edit.writeOption_hasHeader": "true",
     "rainbow_csv.enable_auto_csv_lint": true,
