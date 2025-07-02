@@ -286,7 +286,7 @@ REPO_CREATED=false
 
 # Try multiple methods to create repository
 if [ ! -z "$GITEA_TOKEN" ] && [ "$GITEA_TOKEN" != "$ADMIN_PASS" ]; then
-    # Method 1: Use token
+    # Method 1: Use token - create empty repository first
     RESPONSE=$(curl -s -X POST \
       "http://localhost:3000/api/v1/user/repos" \
       -H "Authorization: token $GITEA_TOKEN" \
@@ -295,17 +295,17 @@ if [ ! -z "$GITEA_TOKEN" ] && [ "$GITEA_TOKEN" != "$ADMIN_PASS" ]; then
         "name": "assignments",
         "description": "Technical interview assignments",
         "private": false,
-        "auto_init": true
+        "auto_init": false
       }' 2>/dev/null || echo "")
     
     if echo "$RESPONSE" | grep -q '"name":"assignments"'; then
-        log "✅ Repository created via token"
+        log "✅ Empty repository created via token"
         REPO_CREATED=true
     fi
 fi
 
 if [ "$REPO_CREATED" = false ]; then
-    # Method 2: Use basic auth
+    # Method 2: Use basic auth - create empty repository
     RESPONSE=$(curl -s -X POST \
       "http://localhost:3000/api/v1/user/repos" \
       -u "$ADMIN_USER:$ADMIN_PASS" \
@@ -314,11 +314,11 @@ if [ "$REPO_CREATED" = false ]; then
         "name": "assignments",
         "description": "Technical interview assignments",
         "private": false,
-        "auto_init": true
+        "auto_init": false
       }' 2>/dev/null || echo "")
     
     if echo "$RESPONSE" | grep -q '"name":"assignments"'; then
-        log "✅ Repository created via basic auth"
+        log "✅ Empty repository created via basic auth"
         REPO_CREATED=true
     fi
 fi
@@ -342,57 +342,32 @@ if [ ! -d "assignments" ]; then
     cp -r task2/* assignments/task2/ 2>/dev/null || echo "No task2 files to copy"
 fi
 
-# Clone the existing repository from Gitea first
-log "📥 Cloning existing repository from Gitea..."
+# Clone the existing repository from Gitea first (if it has content) or create locally
+log "📥 Setting up repository with assignment files..."
 rm -rf /tmp/gitea_assignments
-if git clone "http://$ADMIN_USER:$ADMIN_PASS@localhost:3000/$ADMIN_USER/assignments.git" /tmp/gitea_assignments 2>/dev/null; then
-    log "✅ Repository cloned from Gitea"
-    
-    # Copy our task files to the cloned repository
-    log "📂 Adding assignment files to repository..."
-    cp -r assignments/* /tmp/gitea_assignments/
-    
-    cd /tmp/gitea_assignments
-    git config user.email "$ADMIN_USER@interview.local"
-    git config user.name "$ADMIN_USER"
-    git add .
-    git commit -m "Add technical interview assignments (task1 and task2)" || log "⚠️ Commit might have failed"
-    
-    # Push back to Gitea
-    if git push origin main 2>/dev/null || git push origin master 2>/dev/null; then
-        log "✅ Assignment files pushed to Gitea repository"
-    else
-        log "⚠️ Push to Gitea failed"
-    fi
-    
-    # Clean up temp directory
-    rm -rf /tmp/gitea_assignments
-    
+
+# Since we created an empty repository, we'll set it up locally
+log "📂 Setting up local repository..."
+cd /root/tech-interview-service-de/assignments
+git init
+git add .
+git config user.email "$ADMIN_USER@interview.local"
+git config user.name "$ADMIN_USER"
+git commit -m "Add technical interview assignments (task1 and task2)" || log "⚠️ Commit might have failed"
+
+# Add remote and push
+git remote add origin "http://$ADMIN_USER:$ADMIN_PASS@localhost:3000/$ADMIN_USER/assignments.git" 2>/dev/null || log "Remote might already exist"
+
+# Push to main branch (Gitea default for new repos)
+if git push -u origin master 2>/dev/null; then
+    log "✅ Assignment files pushed to master branch"
+elif git push -u origin main 2>/dev/null; then
+    log "✅ Assignment files pushed to main branch"
 else
-    # Fallback: create repository locally if clone failed
-    log "⚠️ Clone failed, creating repository locally..."
-    cd assignments
-    git init
-    git add .
-    git config user.email "$ADMIN_USER@interview.local"
-    git config user.name "$ADMIN_USER"
-    git commit -m "Initial assignments setup" || echo "Commit might have failed"
-
-    # Add remote and push
-    git remote add origin "http://$ADMIN_USER:$ADMIN_PASS@localhost:3000/$ADMIN_USER/assignments.git" 2>/dev/null || log "Remote might already exist"
-
-    # Try to push to master first, then main
-    if git push -u origin master 2>/dev/null; then
-        log "✅ Pushed to master branch"
-    elif git push -u origin main 2>/dev/null; then
-        log "✅ Pushed to main branch"
-    else
-        log "⚠️ Initial push failed, trying push-to-create..."
-        # This should work with ENABLE_PUSH_CREATE_USER = true
-        git push --set-upstream origin master 2>/dev/null || \
-        git push --set-upstream origin main 2>/dev/null || \
-        log "❌ All push attempts failed"
-    fi
+    log "⚠️ Push failed, trying with force..."
+    git push --set-upstream origin master --force 2>/dev/null || \
+    git push --set-upstream origin main --force 2>/dev/null || \
+    log "❌ All push attempts failed"
 fi
 
 # Clone assignments to admin user home directory
