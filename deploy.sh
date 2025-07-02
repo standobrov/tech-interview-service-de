@@ -1,7 +1,22 @@
 #!/bin/bash
 
+# Simple deployment script - DEPRECATED
+# Please use deploy_new.sh for full automated deployment
+
+echo "⚠️  WARNING: This script is deprecated!"
+echo "📢 Please use deploy_new.sh for full automated deployment"
+echo ""
+echo "Usage: sudo ./deploy_new.sh"
+echo ""
+read -p "Do you want to continue with the old script? (y/N): " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Exiting. Please use deploy_new.sh instead."
+    exit 1
+fi
+
 # Exit on error
-#set -e
+set -e
 
 # Word lists for username generation
 names=(
@@ -94,14 +109,8 @@ EOF
 # Reload systemd and start services
 echo "Starting services..."
 sudo systemctl daemon-reload
-sudo systemctl enable tech-interview-stand-backend
-sudo systemctl enable tech-interview-stand-binance
 sudo systemctl enable code-server@"$ADMIN_USER"
-sudo systemctl start tech-interview-stand-backend
-sudo systemctl start tech-interview-stand-binance
 sudo systemctl start code-server@"$ADMIN_USER"
-sudo systemctl restart nginx
-
 echo "Deployment completed successfully!"
 
 # Get server IP

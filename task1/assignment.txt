@@ -1,0 +1,106 @@
+# Task 1: Data Cleaning and Exchange Mapping Assignment
+
+## Overview
+You are provided with trading data that requires cleaning and standardization. The goal is to process raw trading data, clean inconsistencies, and enrich it with exchange information.
+
+## Input Files
+
+### 1. trades.csv
+Contains raw trading data with the following columns:
+- `trade_id`: Unique identifier for each trade
+- `symbol`: Stock symbol (may have inconsistent formatting)
+- `trade_date`: Date of the trade (multiple formats)
+- `price`: Trade price (may contain invalid values, currency symbols, spaces)
+- `quantity`: Number of shares traded (may contain text or be empty)
+- `trader`: Name of the trader (may have inconsistent spacing/formatting)
+
+### 2. exchange_mapping.csv
+Contains mapping between stock symbols and their corresponding exchanges:
+- `symbol`: Stock symbol (standardized format)
+- `exchange`: Exchange where the stock is traded
+
+## Data Quality Issues to Address
+
+### Date Format Inconsistencies
+- ISO format: `2025-06-30`
+- US format: `30/06/2025` 
+- European format: `28-06-2025`
+- Text format: `Jun 29 2025`
+
+### Price Data Issues
+- Currency symbols: `$152.34`
+- Extra spaces: ` 712.50 `
+- Invalid values: `N/A`, `null`
+- Missing values: empty cells
+
+### Quantity Issues
+- Text values: `twenty`
+- Missing values: empty cells
+- Zero quantities: `0`
+
+### Trader Name Issues
+- Inconsistent spacing: `   Patel`, `   Martin  `
+- Case sensitivity: `Smith` vs `smith`
+- Missing values: empty cells
+- Special characters: `O'Neil`, `D'Souza`, `Müller`
+
+### Symbol Format Issues
+- Extra spaces: `AAPL `, `CVX `
+- Case inconsistency: `msft`, `GOOG`
+
+### Duplicate Records
+- Exact duplicates that should be removed
+
+## Expected Output
+
+Create a cleaned dataset with the following requirements:
+
+### 1. Data Standardization
+- **Dates**: Convert all dates to ISO format (YYYY-MM-DD)
+- **Prices**: Remove currency symbols and extra spaces, convert to float
+- **Quantities**: Convert text to numbers where possible, handle missing values
+- **Trader names**: Trim spaces, standardize capitalization
+- **Symbols**: Convert to uppercase, remove extra spaces
+
+### 2. Data Validation
+- Remove or flag invalid price values (null, N/A, non-numeric)
+- Handle missing quantities appropriately
+- Validate date formats and ranges
+
+### 3. Exchange Mapping
+- Add an `exchange` column to each trade record
+- Use the exchange_mapping.csv file to map symbols to exchanges
+- Handle cases where symbol is not found in mapping
+
+### 4. Duplicate Handling
+- Identify and remove exact duplicate records
+- Keep only one instance of each unique trade
+
+### 5. Output Format
+The final cleaned dataset should contain columns:
+- `trade_id`: Integer
+- `symbol`: String (uppercase, trimmed)
+- `trade_date`: Date (YYYY-MM-DD format)
+- `price`: Float (or null for invalid values)
+- `quantity`: Integer (or null for invalid values)
+- `trader`: String (properly formatted)
+- `exchange`: String (from mapping file)
+
+## Implementation Guidelines
+
+1. **Read both input files** (trades.csv and exchange_mapping.csv)
+2. **Clean each column** according to the specifications above
+3. **Map exchanges** using the provided mapping file
+4. **Remove duplicates** based on all columns
+5. **Validate data integrity** and handle edge cases
+6. **Export cleaned data** to a new CSV file
+
+## Success Criteria
+
+- All date formats are standardized to ISO format
+- Price values are properly cleaned and converted to numeric format
+- Trader names are consistently formatted
+- All valid trades have corresponding exchange information
+- Duplicates are removed
+- Invalid data is properly handled (null values or removed records)
+- Output file is properly formatted and ready for analysis
