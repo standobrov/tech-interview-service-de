@@ -13,15 +13,14 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Check if Docker is installed
-if ! command -v docker &> /dev/null; then
-    echo "❌ Docker is not installed. Please install Docker first."
+# Check basic requirements
+if ! command -v curl &> /dev/null; then
+    echo "❌ curl is not installed. Please install curl first."
     exit 1
 fi
 
-# Check if Docker Compose is installed
-if ! command -v docker-compose &> /dev/null; then
-    echo "❌ Docker Compose is not installed. Please install docker-compose first."
+if ! command -v wget &> /dev/null; then
+    echo "❌ wget is not installed. Please install wget first."
     exit 1
 fi
 
@@ -34,8 +33,8 @@ echo ""
 echo "📋 Quick verification commands:"
 echo "curl http://localhost:3000  # Check Gitea"
 echo "curl http://localhost:8080  # Check Code-Server"
+echo "systemctl status gitea # Check Gitea service"
 echo "systemctl status code-server@* # Check Code-Server service"
-echo "docker ps  # Check running containers"
 echo ""
 echo "📄 Check deployment info:"
 echo "cat /root/deployment-info.txt"

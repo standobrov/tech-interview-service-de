@@ -5,21 +5,18 @@
 
 echo "🧹 Cleaning up failed deployment..."
 
-# Stop and remove containers
-echo "Stopping containers..."
-docker stop gitea 2>/dev/null || true
-docker rm gitea 2>/dev/null || true
-docker stop gitea_db_1 2>/dev/null || true
-docker rm gitea_db_1 2>/dev/null || true
+# Stop Gitea service
+echo "Stopping Gitea service..."
+systemctl stop gitea 2>/dev/null || true
+systemctl disable gitea 2>/dev/null || true
 
-# Remove Docker compose
-if [ -d "/opt/gitea" ]; then
-    echo "Removing Gitea setup..."
-    cd /opt/gitea
-    docker-compose down 2>/dev/null || true
-    cd /
-    rm -rf /opt/gitea
-fi
+# Remove Gitea files
+echo "Removing Gitea installation..."
+rm -f /usr/local/bin/gitea
+rm -f /etc/systemd/system/gitea.service
+rm -rf /var/lib/gitea
+rm -rf /etc/gitea
+rm -rf /home/git/gitea-repositories
 
 # Stop code-server services
 echo "Stopping code-server services..."
@@ -38,6 +35,9 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     
     # Remove service user
     userdel interview_service_user 2>/dev/null || true
+    
+    # Remove git user
+    userdel -r git 2>/dev/null || true
 fi
 
 # Remove systemd service
@@ -47,16 +47,6 @@ systemctl daemon-reload
 # Clean up logs
 rm -f /root/deployment.log
 rm -f /root/deployment-info.txt
-
-# Remove Docker images (optional)
-read -p "Remove Docker images to save space? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    docker rmi gitea/gitea:1.21.4 2>/dev/null || true
-    docker rmi postgres:14 2>/dev/null || true
-    docker rmi hello-world 2>/dev/null || true
-    docker system prune -f 2>/dev/null || true
-fi
 
 echo "🎉 Cleanup completed!"
 echo "You can now run deploy_new.sh again."

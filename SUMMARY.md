@@ -50,17 +50,20 @@ sudo ./test_deploy.sh
 - **SSH**: PORT 22 (Admin access)
 
 ## 🐛 Recent Fixes
-- ✅ Fixed Gitea user permissions (runs as non-root user 1001:1001)
-- ✅ Simplified to SQLite database (removed PostgreSQL dependency)
-- ✅ Improved token creation with fallback to basic auth
-- ✅ Added better Docker installation and verification
+- ✅ **Removed Docker dependency** - Gitea now runs natively on host
+- ✅ Fixed all permission issues with containers
+- ✅ Simplified installation - no more Docker complications
+- ✅ Better service management with systemd
+- ✅ Faster startup and more reliable operation
 - ✅ Enhanced error handling and logging
 - ✅ Added cleanup script for failed deployments
 
 ## 🛠️ Troubleshooting Tools
 - `./cleanup.sh` - Clean up failed deployment
-- `./test_deploy.sh` - Local testing
+- `./test_deploy.sh` - Local testing (no Docker required)
 - `/root/deployment.log` - Full deployment log
+- `systemctl status gitea` - Check Gitea service
+- `systemctl status code-server@USERNAME` - Check Code-Server
 
 ## 📊 What Gets Created
 1. **Admin User**: Random username with SSH key access and sudo rights

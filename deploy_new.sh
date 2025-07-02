@@ -57,33 +57,26 @@ ADMIN_PUBLIC_KEY=$(cat "$SSH_KEY_PATH.pub")
 log "📦 Updating system packages..."
 apt-get update -y
 
-# Install required system packages including Docker
+# Install required system packages
 log "📦 Installing required packages..."
-apt-get install -y python3 python3-pip python3-venv curl wget git sqlite3 docker.io docker-compose
+apt-get install -y python3 python3-pip python3-venv curl wget git sqlite3
 
-# Ensure Docker is running
-log "🐳 Ensuring Docker is running..."
-systemctl enable docker
-systemctl start docker
+# Create git user for Gitea
+log "� Creating git user for Gitea..."
+adduser --system --shell /bin/bash --gecos 'Git Version Control' --group --disabled-password --home /home/git git
 
-# Wait for Docker to be fully ready
-sleep 10
+# Download and install Gitea
+log "� Downloading and installing Gitea..."
+wget -O /usr/local/bin/gitea https://dl.gitea.io/gitea/1.21.4/gitea-1.21.4-linux-amd64
+chmod +x /usr/local/bin/gitea
 
-# Verify Docker is working
-log "🔍 Verifying Docker installation..."
-if ! docker info >/dev/null 2>&1; then
-    log "❌ Docker is not running properly"
-    systemctl status docker
-    exit 1
-fi
-
-# Test Docker with hello-world
-if ! docker run --rm hello-world >/dev/null 2>&1; then
-    log "❌ Docker test failed"
-    exit 1
-fi
-
-log "✅ Docker is working properly"
+# Create Gitea directories
+mkdir -p /var/lib/gitea/{custom,data,log}
+chown -R git:git /var/lib/gitea/
+chmod -R 750 /var/lib/gitea/
+mkdir -p /etc/gitea
+chown root:git /etc/gitea
+chmod 770 /etc/gitea
 
 # Create admin user with SSH access
 log "👤 Creating admin user: $ADMIN_USER..."
@@ -102,81 +95,121 @@ chown -R "$ADMIN_USER:$ADMIN_USER" /home/"$ADMIN_USER"/.ssh
 log "👤 Creating service user: $SERVICE_USER..."
 useradd -r -s /bin/false "$SERVICE_USER"
 
-# Setup Gitea with Docker
-log "🐳 Setting up Gitea..."
-mkdir -p /opt/gitea
-cd /opt/gitea
+# Setup Gitea systemd service
+log "� Setting up Gitea systemd service..."
+cat > /etc/systemd/system/gitea.service <<EOF
+[Unit]
+Description=Gitea (Git with a cup of tea)
+After=syslog.target
+After=network.target
 
-# Create Gitea docker-compose with SQLite (simpler setup)
-cat > docker-compose.yml <<EOF
-version: "3"
+[Service]
+Type=simple
+User=git
+Group=git
+WorkingDirectory=/var/lib/gitea/
+RuntimeDirectory=gitea
+ExecStart=/usr/local/bin/gitea web --config /etc/gitea/app.ini
+Restart=always
+Environment=USER=git HOME=/home/git GITEA_WORK_DIR=/var/lib/gitea
 
-networks:
-  gitea:
-    external: false
-
-services:
-  server:
-    image: gitea/gitea:1.21.4
-    container_name: gitea
-    environment:
-      - USER_UID=1001
-      - USER_GID=1001
-      - GITEA__database__DB_TYPE=sqlite3
-      - GITEA__database__PATH=/data/gitea/gitea.db
-      - GITEA__server__DOMAIN=localhost
-      - GITEA__server__SSH_DOMAIN=localhost
-      - GITEA__server__ROOT_URL=http://localhost:3000/
-      - GITEA__security__INSTALL_LOCK=true
-      - GITEA__service__DISABLE_REGISTRATION=true
-      - GITEA__service__REQUIRE_SIGNIN_VIEW=false
-      - GITEA__security__SECRET_KEY=$(openssl rand -base64 32)
-      - GITEA__security__INTERNAL_TOKEN=$(openssl rand -base64 32)
-    restart: always
-    networks:
-      - gitea
-    volumes:
-      - ./gitea:/data
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
-    ports:
-      - "3000:3000"
-      - "222:22"
-    user: "1001:1001"
+[Install]
+WantedBy=multi-user.target
 EOF
 
-# Create gitea data directory with proper permissions
-mkdir -p ./gitea
-chown -R 1001:1001 ./gitea
+# Create initial Gitea configuration
+log "⚙️ Creating Gitea configuration..."
+cat > /etc/gitea/app.ini <<EOF
+APP_NAME = Tech Interview Gitea
+RUN_MODE = prod
+RUN_USER = git
 
-# Start Gitea
-log "🚀 Starting Gitea..."
-docker-compose up -d
+[repository]
+ROOT = /home/git/gitea-repositories
+
+[server]
+DOMAIN = localhost
+HTTP_PORT = 3000
+ROOT_URL = http://localhost:3000/
+DISABLE_SSH = false
+SSH_PORT = 22
+SSH_LISTEN_PORT = 2222
+LFS_START_SERVER = true
+OFFLINE_MODE = false
+
+[database]
+DB_TYPE = sqlite3
+PATH = /var/lib/gitea/data/gitea.db
+
+[session]
+PROVIDER = file
+
+[log]
+MODE = file
+LEVEL = info
+ROOT_PATH = /var/lib/gitea/log
+
+[security]
+INSTALL_LOCK = true
+SECRET_KEY = $(openssl rand -base64 32)
+
+[service]
+DISABLE_REGISTRATION = true
+REQUIRE_SIGNIN_VIEW = false
+REGISTER_EMAIL_CONFIRM = false
+ENABLE_NOTIFY_MAIL = false
+ALLOW_ONLY_EXTERNAL_REGISTRATION = false
+ENABLE_CAPTCHA = false
+DEFAULT_KEEP_EMAIL_PRIVATE = false
+DEFAULT_ALLOW_CREATE_ORGANIZATION = true
+
+[picture]
+DISABLE_GRAVATAR = false
+ENABLE_FEDERATED_AVATAR = true
+
+[openid]
+ENABLE_OPENID_SIGNIN = true
+ENABLE_OPENID_SIGNUP = true
+
+[mailer]
+ENABLED = false
+EOF
+
+# Set proper permissions
+chown git:git /etc/gitea/app.ini
+chmod 640 /etc/gitea/app.ini
+
+# Create git repositories directory
+mkdir -p /home/git/gitea-repositories
+chown git:git /home/git/gitea-repositories
+
+# Start Gitea service
+log "🚀 Starting Gitea service..."
+systemctl daemon-reload
+systemctl enable gitea
+systemctl start gitea
 
 # Wait for Gitea to be ready
 log "⏳ Waiting for Gitea to be ready..."
-sleep 45
-
-# Check if Gitea is responding
-for i in {1..10}; do
+for i in {1..30}; do
     if curl -s http://localhost:3000 > /dev/null; then
         log "✅ Gitea is ready!"
         break
     fi
-    log "⏳ Still waiting for Gitea... (attempt $i/10)"
-    sleep 10
+    log "⏳ Still waiting for Gitea... (attempt $i/30)"
+    sleep 5
 done
 
 # Setup Gitea admin user
 log "👤 Setting up Gitea admin user..."
 
-# Create Gitea admin user using the proper method
-docker exec -u git gitea gitea admin user create \
+# Create Gitea admin user using the binary
+sudo -u git /usr/local/bin/gitea admin user create \
+  --config /etc/gitea/app.ini \
   --username "$ADMIN_USER" \
   --password "$ADMIN_PASS" \
   --email "$ADMIN_USER@interview.local" \
-  --admin \
-  --must-change-password=false || log "⚠️ User creation failed, might already exist"
+  --admin || log "⚠️ User creation failed, might already exist"
 
 # Get server IP
 SERVER_IP=$(hostname -I | awk '{print $1}')
@@ -361,6 +394,13 @@ if curl -s http://localhost:3000 > /dev/null; then
     log "✅ Gitea is running"
 else
     log "⚠️ Gitea might not be fully ready yet"
+fi
+
+# Check Gitea systemd service
+if systemctl is-active --quiet gitea; then
+    log "✅ Gitea systemd service is active"
+else
+    log "⚠️ Gitea systemd service is not active"
 fi
 
 # Check Code-Server
