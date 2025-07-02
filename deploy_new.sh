@@ -402,17 +402,29 @@ else
 fi
 
 # Set global git config for admin user
+log "⚙️ Setting up git configuration for $ADMIN_USER..."
 sudo -u "$ADMIN_USER" bash -c "
+  cd /home/$ADMIN_USER
   git config --global user.email '$ADMIN_USER@interview.local'
   git config --global user.name '$ADMIN_USER'
 "
+log "✅ Git configuration completed"
 
 # Setup code-server for admin user
 log "💻 Setting up code-server for $ADMIN_USER..."
 
 # Install code-server via package manager to avoid sudo issues
 log "📦 Installing code-server from package..."
+
+# Set temporary environment to avoid /root access issues
+export HOME=/tmp
+export USER=root
+
 curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix=/usr/local
+
+# Reset environment
+export HOME=/root
+unset USER
 
 # Verify installation
 if [ ! -f "/usr/local/bin/code-server" ]; then

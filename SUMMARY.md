@@ -5,7 +5,7 @@
 
 ## 📋 Features
 - ✅ Автоматическое создание пользователей и SSH ключей
-- ✅ Развертывание Gitea (Git сервер) через Docker
+- ✅ Развертывание Gitea (нативная установка на хост)
 - ✅ Создание репозитория с заданиями
 - ✅ Настройка Code-Server (VS Code в браузере)
 - ✅ Полное логирование и обработка ошибок
@@ -70,7 +70,7 @@ sudo ./test_deploy.sh
 
 ## 📊 What Gets Created
 1. **Admin User**: Random username with SSH key access and sudo rights
-2. **Gitea Instance**: Docker-based Git server with assignments repository
+2. **Gitea Instance**: Native Git server with assignments repository
 3. **Code-Server**: Browser-based VS Code pointing to assignments folder
 4. **Service Files**: Systemd services for automatic startup
 
@@ -98,27 +98,27 @@ sudo ./test_deploy.sh
 - Deployment log: `/root/deployment.log`
 - Credentials: `/root/deployment-info.txt`
 - Service logs: `journalctl -u code-server@USERNAME`
-- Container logs: `docker logs gitea`
+- Gitea logs: `journalctl -u gitea`
 
 ## 🔄 Common Commands
 ```bash
 # Check service status
+systemctl status gitea
 systemctl status code-server@USERNAME
-docker ps
 
 # Restart services
+systemctl restart gitea
 systemctl restart code-server@USERNAME
-cd /opt/gitea && docker-compose restart
 
 # View logs
 cat /root/deployment.log
-docker logs gitea
+journalctl -u gitea -f
 ```
 
 ## 💡 Troubleshooting
-- If services don't start: Check Docker status and logs
-- If ports are blocked: Verify firewall settings
-- If Git operations fail: Check Gitea container health
+- If services don't start: Check systemd status and logs
+- If ports are blocked: Verify firewall settings  
+- If Git operations fail: Check Gitea service health
 - If Code-Server is inaccessible: Verify systemd service status
 
 ## 🎯 Next Steps After Deployment
