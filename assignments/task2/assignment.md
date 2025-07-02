@@ -16,6 +16,7 @@ Notes:
 - There may be multiple events with the same timestamp.
 
 Example:
+```
 events = [
     {"timestamp": 1, "bytes": 100},
     {"timestamp": 2, "bytes": 50},
@@ -23,6 +24,7 @@ events = [
     {"timestamp": 6, "bytes": 10},
     {"timestamp": 7, "bytes": 30},
 ]
+```
 
 max_bytes(events) should return 450, since the window [1, 6) contains the first three events,
 with a total of 100 + 50 + 300 = 450 bytes.

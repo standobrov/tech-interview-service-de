@@ -22,15 +22,15 @@
 
 ### Local Testing
 ```bash
-sudo ./test_deploy.sh
+# The deployment script can be tested locally
+sudo ./deploy_new.sh
 ```
 
 ## 📁 Project Structure
 ```
 ├── cloud-init.yaml          # Hetzner Cloud init config
 ├── deploy_new.sh             # Main deployment script
-├── deploy.sh                 # Legacy script (deprecated)
-├── test_deploy.sh            # Local testing script
+├── cleanup.sh                # Clean up failed deployment
 ├── README.md                 # Full documentation
 ├── SUMMARY.md                # This file
 └── assignments/
@@ -61,9 +61,6 @@ sudo ./test_deploy.sh
 
 ## 🛠️ Troubleshooting Tools
 - `./cleanup.sh` - Clean up failed deployment
-- `./test_deploy.sh` - Local testing (no Docker required)
-- `./check_status.sh` - Quick system status check with user info
-- `./test_copy_fix.sh` - Test the permission fix specifically
 - `/root/deployment.log` - Full deployment log
 - `systemctl status gitea` - Check Gitea service
 - `systemctl status code-server@USERNAME` - Check Code-Server
