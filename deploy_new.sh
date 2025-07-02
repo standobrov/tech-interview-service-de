@@ -342,27 +342,57 @@ if [ ! -d "assignments" ]; then
     cp -r task2/* assignments/task2/ 2>/dev/null || echo "No task2 files to copy"
 fi
 
-cd assignments
-git init
-git add .
-git config user.email "$ADMIN_USER@interview.local"
-git config user.name "$ADMIN_USER"
-git commit -m "Initial assignments setup" || echo "Commit might have failed"
-
-# Add remote and push
-git remote add origin "http://$ADMIN_USER:$ADMIN_PASS@localhost:3000/$ADMIN_USER/assignments.git" 2>/dev/null || log "Remote might already exist"
-
-# Try to push to master first, then main
-if git push -u origin master 2>/dev/null; then
-    log "✅ Pushed to master branch"
-elif git push -u origin main 2>/dev/null; then
-    log "✅ Pushed to main branch"
+# Clone the existing repository from Gitea first
+log "📥 Cloning existing repository from Gitea..."
+rm -rf /tmp/gitea_assignments
+if git clone "http://$ADMIN_USER:$ADMIN_PASS@localhost:3000/$ADMIN_USER/assignments.git" /tmp/gitea_assignments 2>/dev/null; then
+    log "✅ Repository cloned from Gitea"
+    
+    # Copy our task files to the cloned repository
+    log "📂 Adding assignment files to repository..."
+    cp -r assignments/* /tmp/gitea_assignments/
+    
+    cd /tmp/gitea_assignments
+    git config user.email "$ADMIN_USER@interview.local"
+    git config user.name "$ADMIN_USER"
+    git add .
+    git commit -m "Add technical interview assignments (task1 and task2)" || log "⚠️ Commit might have failed"
+    
+    # Push back to Gitea
+    if git push origin main 2>/dev/null || git push origin master 2>/dev/null; then
+        log "✅ Assignment files pushed to Gitea repository"
+    else
+        log "⚠️ Push to Gitea failed"
+    fi
+    
+    # Clean up temp directory
+    rm -rf /tmp/gitea_assignments
+    
 else
-    log "⚠️ Initial push failed, trying push-to-create..."
-    # This should work with ENABLE_PUSH_CREATE_USER = true
-    git push --set-upstream origin master 2>/dev/null || \
-    git push --set-upstream origin main 2>/dev/null || \
-    log "❌ All push attempts failed"
+    # Fallback: create repository locally if clone failed
+    log "⚠️ Clone failed, creating repository locally..."
+    cd assignments
+    git init
+    git add .
+    git config user.email "$ADMIN_USER@interview.local"
+    git config user.name "$ADMIN_USER"
+    git commit -m "Initial assignments setup" || echo "Commit might have failed"
+
+    # Add remote and push
+    git remote add origin "http://$ADMIN_USER:$ADMIN_PASS@localhost:3000/$ADMIN_USER/assignments.git" 2>/dev/null || log "Remote might already exist"
+
+    # Try to push to master first, then main
+    if git push -u origin master 2>/dev/null; then
+        log "✅ Pushed to master branch"
+    elif git push -u origin main 2>/dev/null; then
+        log "✅ Pushed to main branch"
+    else
+        log "⚠️ Initial push failed, trying push-to-create..."
+        # This should work with ENABLE_PUSH_CREATE_USER = true
+        git push --set-upstream origin master 2>/dev/null || \
+        git push --set-upstream origin main 2>/dev/null || \
+        log "❌ All push attempts failed"
+    fi
 fi
 
 # Clone assignments to admin user home directory
