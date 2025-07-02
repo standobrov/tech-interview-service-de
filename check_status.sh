@@ -58,14 +58,42 @@ else
     echo "❌ Code-Server binary: Not found"
 fi
 
+# Check for created users
+echo ""
+echo "👥 Created Users:"
+echo "================="
+# Find users with naruto-themed usernames
+FOUND_USERS=$(grep -E "(naruto|sasuke|sakura|kakashi|jiraiya|tsunade|orochimaru|itachi|madara|obito|shikamaru|choji|ino|neji|rocklee|gaara|temari|kankuro|hinata|minato|deidara|kisame|pain)" /etc/passwd | cut -d: -f1 || echo "")
+if [ ! -z "$FOUND_USERS" ]; then
+    for user in $FOUND_USERS; do
+        echo "✅ Admin user: $user"
+        if [ -d "/home/$user/assignments" ]; then
+            echo "  📂 Assignments folder: Present"
+        else
+            echo "  ❌ Assignments folder: Missing"
+        fi
+    done
+else
+    echo "❌ No admin users found"
+fi
+
+# Check for git user
+if grep -q "^git:" /etc/passwd; then
+    echo "✅ Git user: Created"
+else
+    echo "❌ Git user: Not found"
+fi
+
 # Check deployment info
 if [ -f "/root/deployment-info.txt" ]; then
+    echo ""
     echo "✅ Deployment info: Available at /root/deployment-info.txt"
     echo ""
     echo "📋 Quick Access Info:"
     echo "===================="
     grep -E "(Server IP|SSH Username|Gitea URL|Code-Server URL)" /root/deployment-info.txt 2>/dev/null || echo "Info parsing failed"
 else
+    echo ""
     echo "❌ Deployment info: Not found"
 fi
 

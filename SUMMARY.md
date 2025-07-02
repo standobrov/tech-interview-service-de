@@ -55,13 +55,15 @@ sudo ./test_deploy.sh
 - ✅ **Improved repository creation** - Multiple fallback methods for repo creation
 - ✅ **Fixed code-server installation** - No more sudo password issues
 - ✅ **Enhanced push-to-create** - Enabled push-to-create in Gitea configuration
+- ✅ **Fixed permission errors** - Resolved /root access issues for user file copying
 - ✅ **Better error handling** - Graceful fallbacks when operations fail
 - ✅ **Robust cloning** - Creates local folder if remote clone fails
 
 ## 🛠️ Troubleshooting Tools
 - `./cleanup.sh` - Clean up failed deployment
 - `./test_deploy.sh` - Local testing (no Docker required)
-- `./check_status.sh` - Quick system status check
+- `./check_status.sh` - Quick system status check with user info
+- `./test_copy_fix.sh` - Test the permission fix specifically
 - `/root/deployment.log` - Full deployment log
 - `systemctl status gitea` - Check Gitea service
 - `systemctl status code-server@USERNAME` - Check Code-Server

@@ -372,6 +372,7 @@ log "📥 Cloning assignments to admin user home..."
 sleep 5
 
 # Try cloning, if it fails, create assignments folder manually
+log "🔄 Attempting to clone repository..."
 if sudo -u "$ADMIN_USER" bash -c "
   cd /home/$ADMIN_USER
   git clone http://$ADMIN_USER:$ADMIN_PASS@localhost:3000/$ADMIN_USER/assignments.git 2>/dev/null
@@ -379,15 +380,25 @@ if sudo -u "$ADMIN_USER" bash -c "
     log "✅ Repository cloned successfully"
 else
     log "⚠️ Repository clone failed, creating local assignments folder..."
+    # Copy assignments folder to a temporary location accessible by admin user
+    log "📋 Copying assignments from /root to temp location..."
+    cp -r /root/tech-interview-service-de/assignments /tmp/assignments_temp
+    chown -R "$ADMIN_USER:$ADMIN_USER" /tmp/assignments_temp
+    
+    log "📂 Setting up local assignments folder for user..."
     sudo -u "$ADMIN_USER" bash -c "
       cd /home/$ADMIN_USER
-      cp -r /root/tech-interview-service-de/assignments ./
+      cp -r /tmp/assignments_temp ./assignments
       cd assignments
       git init
       git remote add origin http://$ADMIN_USER:$ADMIN_PASS@localhost:3000/$ADMIN_USER/assignments.git
       git config user.email '$ADMIN_USER@interview.local'
       git config user.name '$ADMIN_USER'
     "
+    
+    # Clean up temp folder
+    rm -rf /tmp/assignments_temp
+    log "✅ Local assignments folder created successfully"
 fi
 
 # Set global git config for admin user
