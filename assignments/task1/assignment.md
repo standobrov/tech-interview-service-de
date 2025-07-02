@@ -8,7 +8,7 @@ You have been given a dataset of trading records that contains various data qual
 - `exchange_mapping.csv` - Mapping of stock symbols to exchanges
 
 ## Your Task
-Create a data processing pipeline that:
+Create a script that
 1. Cleans and standardizes the trading data
 2. Maps each trade to its corresponding exchange
 3. Outputs clean, analysis-ready data
@@ -24,7 +24,7 @@ You'll find various issues in the data that need to be addressed:
 
 ## Expected Deliverables
 - Clean CSV file with standardized data
-- Simple Python script using pandas
+- Python script (you can use pandas)
 
 
 ## Requirements
@@ -34,17 +34,4 @@ Your solution should handle these core issues:
 - Standardize trader names (proper case, trim spaces)
 - Normalize stock symbols (uppercase, trim)
 - Add exchange information from mapping file
-- Remove exact duplicates
-
-## Evaluation Criteria
-- **Functionality**: Does your solution clean the main data issues?
-- **Pandas Usage**: Do you use appropriate pandas methods?
-- **Code Structure**: Is your code organized and readable?
-
-**Focus on getting a working solution rather than perfect edge case handling.**
-
-## Time Estimate
-This task should take approximately 30 minutes to complete.
-
-## Questions?
-If you have any questions or need clarification, please ask!
+- Remove duplicates

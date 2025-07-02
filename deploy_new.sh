@@ -61,6 +61,10 @@ apt-get update -y
 log "📦 Installing required packages..."
 apt-get install -y python3 python3-pip python3-venv curl wget git sqlite3
 
+# Install Python packages including pandas
+log "🐍 Installing Python packages..."
+pip3 install pandas numpy matplotlib seaborn jupyter
+
 # Create git user for Gitea
 log "� Creating git user for Gitea..."
 adduser --system --shell /bin/bash --gecos 'Git Version Control' --group --disabled-password --home /home/git git
@@ -468,6 +472,33 @@ password: $CODE_SERVER_PASSWORD
 cert: false
 EOF
 
+# Setup code-server workspace settings with dark theme
+log "🎨 Setting up code-server with dark theme and extensions..."
+mkdir -p /home/"$ADMIN_USER"/.local/share/code-server/User
+sudo -u "$ADMIN_USER" tee /home/"$ADMIN_USER"/.local/share/code-server/User/settings.json > /dev/null <<EOF
+{
+    "workbench.colorTheme": "Default Dark+",
+    "workbench.preferredDarkColorTheme": "Default Dark+",
+    "workbench.preferredLightColorTheme": "Default Light+",
+    "editor.theme": "Default Dark+",
+    "window.autoDetectColorScheme": false,
+    "workbench.startupEditor": "welcomePage",
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 1000,
+    "editor.fontSize": 14,
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "python.defaultInterpreterPath": "/usr/bin/python3",
+    "csv-edit.readOption_hasHeader": "true",
+    "csv-edit.writeOption_hasHeader": "true",
+    "rainbow_csv.enable_auto_csv_lint": true,
+    "rainbow_csv.enable_tooltip": true
+}
+EOF
+
+# Set proper ownership for code-server config
+chown -R "$ADMIN_USER:$ADMIN_USER" /home/"$ADMIN_USER"/.local
+
 # Create systemd service for code-server
 tee /etc/systemd/system/code-server@.service > /dev/null <<EOF
 [Unit]
@@ -490,6 +521,30 @@ log "🚀 Starting services..."
 systemctl daemon-reload
 systemctl enable code-server@"$ADMIN_USER"
 systemctl start code-server@"$ADMIN_USER"
+
+# Wait for code-server to start and install extensions
+log "📦 Installing code-server extensions..."
+sleep 10
+
+# Install extensions for the admin user
+sudo -u "$ADMIN_USER" bash -c "
+  # Install Rainbow CSV extension
+  /usr/local/bin/code-server --install-extension mechatroner.rainbow-csv --user-data-dir /home/$ADMIN_USER/.local/share/code-server --config /home/$ADMIN_USER/.config/code-server/config.yaml
+  
+  # Install Python extension
+  /usr/local/bin/code-server --install-extension ms-python.python --user-data-dir /home/$ADMIN_USER/.local/share/code-server --config /home/$ADMIN_USER/.config/code-server/config.yaml
+  
+  # Install Jupyter extension
+  /usr/local/bin/code-server --install-extension ms-toolsai.jupyter --user-data-dir /home/$ADMIN_USER/.local/share/code-server --config /home/$ADMIN_USER/.config/code-server/config.yaml
+  
+  # Install CSV Edit extension for better CSV handling
+  /usr/local/bin/code-server --install-extension janisdd.vscode-edit-csv --user-data-dir /home/$ADMIN_USER/.local/share/code-server --config /home/$ADMIN_USER/.config/code-server/config.yaml
+" 2>/dev/null || log "⚠️ Some extensions might not have installed"
+
+# Restart code-server to load extensions
+log "🔄 Restarting code-server to load extensions..."
+systemctl restart code-server@"$ADMIN_USER"
+sleep 5
 
 # Cleanup temp SSH keys
 rm -f "$SSH_KEY_PATH" "$SSH_KEY_PATH.pub"

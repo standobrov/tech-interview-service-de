@@ -22,7 +22,7 @@ cd tech-interview-service-de
 
 # Установка зависимостей (Ubuntu/Debian)
 sudo apt-get update
-sudo apt-get install -y docker.io docker-compose python3 python3-pip git
+sudo apt-get install -y python3 python3-pip git curl wget
 
 # Запуск автоматического развертывания
 sudo ./deploy_new.sh
@@ -57,13 +57,19 @@ ssh <username>@<server_ip>
 ### Code-Server (VS Code в браузере)
 - URL: `http://<server_ip>:8080`
 - Рабочая папка: `/home/<username>/assignments`
+- **Предустановленные расширения**:
+  - Rainbow CSV - для красивого отображения CSV файлов
+  - Python - поддержка Python с автодополнением
+  - Jupyter - поддержка Jupyter notebooks
+  - CSV Edit - интерактивное редактирование CSV
+- **Предустановленные Python пакеты**: pandas, numpy, matplotlib, seaborn, jupyter
+- **Тема**: Темная тема включена по умолчанию
 
 ## Управление сервисами
 
 ### Перезапуск Gitea
 ```bash
-cd /opt/gitea
-sudo docker-compose restart
+sudo systemctl restart gitea
 ```
 
 ### Перезапуск Code-Server
@@ -77,8 +83,7 @@ sudo systemctl restart code-server@<username>
 sudo cat /root/deployment.log
 
 # Логи Gitea
-cd /opt/gitea
-sudo docker-compose logs
+sudo journalctl -u gitea -f
 
 # Логи Code-Server
 sudo systemctl status code-server@<username>

@@ -52,6 +52,6 @@ events = [
 ]
 
 def max_bytes(events):
-    pass
+    pass # write your code here
 
 print(max_bytes(events))
