@@ -49,6 +49,19 @@ sudo ./test_deploy.sh
 - **Code-Server**: http://SERVER_IP:8080 (VS Code interface)
 - **SSH**: PORT 22 (Admin access)
 
+## 🐛 Recent Fixes
+- ✅ Fixed Gitea user permissions (runs as non-root user 1001:1001)
+- ✅ Simplified to SQLite database (removed PostgreSQL dependency)
+- ✅ Improved token creation with fallback to basic auth
+- ✅ Added better Docker installation and verification
+- ✅ Enhanced error handling and logging
+- ✅ Added cleanup script for failed deployments
+
+## 🛠️ Troubleshooting Tools
+- `./cleanup.sh` - Clean up failed deployment
+- `./test_deploy.sh` - Local testing
+- `/root/deployment.log` - Full deployment log
+
 ## 📊 What Gets Created
 1. **Admin User**: Random username with SSH key access and sudo rights
 2. **Gitea Instance**: Docker-based Git server with assignments repository

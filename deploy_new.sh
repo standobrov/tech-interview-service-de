@@ -57,21 +57,33 @@ ADMIN_PUBLIC_KEY=$(cat "$SSH_KEY_PATH.pub")
 log "📦 Updating system packages..."
 apt-get update -y
 
-# Install required system packages
+# Install required system packages including Docker
 log "📦 Installing required packages..."
-apt-get install -y python3 python3-pip python3-venv curl wget git sqlite3
+apt-get install -y python3 python3-pip python3-venv curl wget git sqlite3 docker.io docker-compose
 
 # Ensure Docker is running
 log "🐳 Ensuring Docker is running..."
 systemctl enable docker
 systemctl start docker
-sleep 5
+
+# Wait for Docker to be fully ready
+sleep 10
 
 # Verify Docker is working
+log "🔍 Verifying Docker installation..."
 if ! docker info >/dev/null 2>&1; then
     log "❌ Docker is not running properly"
+    systemctl status docker
     exit 1
 fi
+
+# Test Docker with hello-world
+if ! docker run --rm hello-world >/dev/null 2>&1; then
+    log "❌ Docker test failed"
+    exit 1
+fi
+
+log "✅ Docker is working properly"
 
 # Create admin user with SSH access
 log "👤 Creating admin user: $ADMIN_USER..."
@@ -95,7 +107,7 @@ log "🐳 Setting up Gitea..."
 mkdir -p /opt/gitea
 cd /opt/gitea
 
-# Create Gitea docker-compose
+# Create Gitea docker-compose with SQLite (simpler setup)
 cat > docker-compose.yml <<EOF
 version: "3"
 
@@ -108,8 +120,8 @@ services:
     image: gitea/gitea:1.21.4
     container_name: gitea
     environment:
-      - USER_UID=1000
-      - USER_GID=1000
+      - USER_UID=1001
+      - USER_GID=1001
       - GITEA__database__DB_TYPE=sqlite3
       - GITEA__database__PATH=/data/gitea/gitea.db
       - GITEA__server__DOMAIN=localhost
@@ -118,6 +130,8 @@ services:
       - GITEA__security__INSTALL_LOCK=true
       - GITEA__service__DISABLE_REGISTRATION=true
       - GITEA__service__REQUIRE_SIGNIN_VIEW=false
+      - GITEA__security__SECRET_KEY=$(openssl rand -base64 32)
+      - GITEA__security__INTERNAL_TOKEN=$(openssl rand -base64 32)
     restart: always
     networks:
       - gitea
@@ -128,21 +142,12 @@ services:
     ports:
       - "3000:3000"
       - "222:22"
-    depends_on:
-      - db
-
-  db:
-    image: postgres:14
-    restart: always
-    environment:
-      - POSTGRES_USER=gitea
-      - POSTGRES_PASSWORD=gitea123
-      - POSTGRES_DB=gitea
-    networks:
-      - gitea
-    volumes:
-      - ./postgres:/var/lib/postgresql/data
+    user: "1001:1001"
 EOF
+
+# Create gitea data directory with proper permissions
+mkdir -p ./gitea
+chown -R 1001:1001 ./gitea
 
 # Start Gitea
 log "🚀 Starting Gitea..."
@@ -150,65 +155,125 @@ docker-compose up -d
 
 # Wait for Gitea to be ready
 log "⏳ Waiting for Gitea to be ready..."
-sleep 30
+sleep 45
+
+# Check if Gitea is responding
+for i in {1..10}; do
+    if curl -s http://localhost:3000 > /dev/null; then
+        log "✅ Gitea is ready!"
+        break
+    fi
+    log "⏳ Still waiting for Gitea... (attempt $i/10)"
+    sleep 10
+done
 
 # Setup Gitea admin user
 log "👤 Setting up Gitea admin user..."
-GITEA_ADMIN_TOKEN=$(openssl rand -hex 20)
 
-# Create Gitea admin user
-docker exec gitea gitea admin user create \
+# Create Gitea admin user using the proper method
+docker exec -u git gitea gitea admin user create \
   --username "$ADMIN_USER" \
   --password "$ADMIN_PASS" \
   --email "$ADMIN_USER@interview.local" \
   --admin \
-  --must-change-password=false || echo "User might already exist"
+  --must-change-password=false || log "⚠️ User creation failed, might already exist"
 
 # Get server IP
 SERVER_IP=$(hostname -I | awk '{print $1}')
 
-# Create access token for admin user
+# Create access token for admin user using API
 log "🔑 Creating Gitea access token..."
-GITEA_TOKEN=$(curl -s -X POST \
-  "http://localhost:3000/api/v1/users/$ADMIN_USER/tokens" \
-  -H "Content-Type: application/json" \
-  -u "$ADMIN_USER:$ADMIN_PASS" \
-  -d '{
-    "name": "deployment-token",
-    "scopes": ["write:repository", "write:user"]
-  }' | python3 -c "import sys, json; print(json.load(sys.stdin)['sha1'])" 2>/dev/null || echo "")
+sleep 5
 
+# Try to create token via API with better error handling
+GITEA_TOKEN=""
+for i in {1..3}; do
+    GITEA_TOKEN=$(curl -s -X POST \
+      "http://localhost:3000/api/v1/users/$ADMIN_USER/tokens" \
+      -H "Content-Type: application/json" \
+      -u "$ADMIN_USER:$ADMIN_PASS" \
+      -d '{
+        "name": "deployment-token"
+      }' | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    if 'sha1' in data:
+        print(data['sha1'])
+    else:
+        print('')
+except:
+    print('')
+" 2>/dev/null || echo "")
+    
+    if [ ! -z "$GITEA_TOKEN" ]; then
+        log "✅ Token created successfully"
+        break
+    fi
+    log "⚠️ Token creation attempt $i failed, retrying..."
+    sleep 5
+done
+
+# Fallback: generate a simple token for basic auth
 if [ -z "$GITEA_TOKEN" ]; then
-  log "⚠️ Could not create token via API, using direct database method..."
-  sleep 5
-  # Alternative method: direct database insertion
-  GITEA_TOKEN="git_$(openssl rand -hex 20)"
-  docker exec gitea sqlite3 /data/gitea/gitea.db "INSERT INTO access_token (uid, name, sha1, token_hash, token_salt, token_last_eight, scope, created_unix, updated_unix) VALUES ((SELECT id FROM user WHERE name='$ADMIN_USER'), 'deployment-token', '$GITEA_TOKEN', '', '', '$(echo $GITEA_TOKEN | tail -c 9)', 'all', $(date +%s), $(date +%s));"
+    log "⚠️ Using password authentication instead of token"
+    GITEA_TOKEN="$ADMIN_PASS"
 fi
 
 # Add SSH key to Gitea user
 log "🔑 Adding SSH key to Gitea..."
-curl -s -X POST \
-  "http://localhost:3000/api/v1/user/keys" \
-  -H "Authorization: token $GITEA_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"title\": \"Admin SSH Key\",
-    \"key\": \"$ADMIN_PUBLIC_KEY\"
-  }" || echo "SSH key addition might have failed"
+if [ ! -z "$GITEA_TOKEN" ] && [ "$GITEA_TOKEN" != "$ADMIN_PASS" ]; then
+    # Use token if available
+    curl -s -X POST \
+      "http://localhost:3000/api/v1/user/keys" \
+      -H "Authorization: token $GITEA_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"title\": \"Admin SSH Key\",
+        \"key\": \"$ADMIN_PUBLIC_KEY\"
+      }" || log "⚠️ SSH key addition via token failed"
+else
+    # Use basic auth
+    curl -s -X POST \
+      "http://localhost:3000/api/v1/user/keys" \
+      -u "$ADMIN_USER:$ADMIN_PASS" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"title\": \"Admin SSH Key\",
+        \"key\": \"$ADMIN_PUBLIC_KEY\"
+      }" || log "⚠️ SSH key addition via basic auth failed"
+fi
 
 # Create assignments repository
 log "📁 Creating assignments repository..."
-curl -s -X POST \
-  "http://localhost:3000/api/v1/user/repos" \
-  -H "Authorization: token $GITEA_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "assignments",
-    "description": "Technical interview assignments",
-    "private": false,
-    "auto_init": true
-  }' || echo "Repository might already exist"
+if [ ! -z "$GITEA_TOKEN" ] && [ "$GITEA_TOKEN" != "$ADMIN_PASS" ]; then
+    # Use token if available
+    curl -s -X POST \
+      "http://localhost:3000/api/v1/user/repos" \
+      -H "Authorization: token $GITEA_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "assignments",
+        "description": "Technical interview assignments",
+        "private": false,
+        "auto_init": true
+      }' || log "⚠️ Repository creation via token failed"
+else
+    # Use basic auth
+    curl -s -X POST \
+      "http://localhost:3000/api/v1/user/repos" \
+      -u "$ADMIN_USER:$ADMIN_PASS" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "assignments",
+        "description": "Technical interview assignments",
+        "private": false,
+        "auto_init": true
+      }' || log "⚠️ Repository creation via basic auth failed"
+fi
+
+# Wait a bit for repository to be ready
+sleep 5
 
 # Setup git in assignments folder and push to Gitea
 log "📂 Setting up assignments repository..."
