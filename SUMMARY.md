@@ -51,16 +51,17 @@ sudo ./test_deploy.sh
 
 ## 🐛 Recent Fixes
 - ✅ **Removed Docker dependency** - Gitea now runs natively on host
-- ✅ Fixed all permission issues with containers
-- ✅ Simplified installation - no more Docker complications
-- ✅ Better service management with systemd
-- ✅ Faster startup and more reliable operation
-- ✅ Enhanced error handling and logging
-- ✅ Added cleanup script for failed deployments
+- ✅ **Fixed token scopes** - Added proper scopes for repository and user operations
+- ✅ **Improved repository creation** - Multiple fallback methods for repo creation
+- ✅ **Fixed code-server installation** - No more sudo password issues
+- ✅ **Enhanced push-to-create** - Enabled push-to-create in Gitea configuration
+- ✅ **Better error handling** - Graceful fallbacks when operations fail
+- ✅ **Robust cloning** - Creates local folder if remote clone fails
 
 ## 🛠️ Troubleshooting Tools
 - `./cleanup.sh` - Clean up failed deployment
 - `./test_deploy.sh` - Local testing (no Docker required)
+- `./check_status.sh` - Quick system status check
 - `/root/deployment.log` - Full deployment log
 - `systemctl status gitea` - Check Gitea service
 - `systemctl status code-server@USERNAME` - Check Code-Server

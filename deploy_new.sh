@@ -162,6 +162,8 @@ ALLOW_ONLY_EXTERNAL_REGISTRATION = false
 ENABLE_CAPTCHA = false
 DEFAULT_KEEP_EMAIL_PRIVATE = false
 DEFAULT_ALLOW_CREATE_ORGANIZATION = true
+ENABLE_PUSH_CREATE_USER = true
+ENABLE_PUSH_CREATE_ORG = true
 
 [picture]
 DISABLE_GRAVATAR = false
@@ -226,7 +228,8 @@ for i in {1..3}; do
       -H "Content-Type: application/json" \
       -u "$ADMIN_USER:$ADMIN_PASS" \
       -d '{
-        "name": "deployment-token"
+        "name": "deployment-token",
+        "scopes": ["write:repository", "write:user", "read:user"]
       }' | python3 -c "
 import sys, json
 try:
@@ -240,14 +243,14 @@ except:
 " 2>/dev/null || echo "")
     
     if [ ! -z "$GITEA_TOKEN" ]; then
-        log "✅ Token created successfully"
+        log "✅ Token created successfully with scopes"
         break
     fi
     log "⚠️ Token creation attempt $i failed, retrying..."
     sleep 5
 done
 
-# Fallback: generate a simple token for basic auth
+# Fallback: use basic auth
 if [ -z "$GITEA_TOKEN" ]; then
     log "⚠️ Using password authentication instead of token"
     GITEA_TOKEN="$ADMIN_PASS"
@@ -279,9 +282,12 @@ fi
 
 # Create assignments repository
 log "📁 Creating assignments repository..."
+REPO_CREATED=false
+
+# Try multiple methods to create repository
 if [ ! -z "$GITEA_TOKEN" ] && [ "$GITEA_TOKEN" != "$ADMIN_PASS" ]; then
-    # Use token if available
-    curl -s -X POST \
+    # Method 1: Use token
+    RESPONSE=$(curl -s -X POST \
       "http://localhost:3000/api/v1/user/repos" \
       -H "Authorization: token $GITEA_TOKEN" \
       -H "Content-Type: application/json" \
@@ -290,10 +296,17 @@ if [ ! -z "$GITEA_TOKEN" ] && [ "$GITEA_TOKEN" != "$ADMIN_PASS" ]; then
         "description": "Technical interview assignments",
         "private": false,
         "auto_init": true
-      }' || log "⚠️ Repository creation via token failed"
-else
-    # Use basic auth
-    curl -s -X POST \
+      }' 2>/dev/null || echo "")
+    
+    if echo "$RESPONSE" | grep -q '"name":"assignments"'; then
+        log "✅ Repository created via token"
+        REPO_CREATED=true
+    fi
+fi
+
+if [ "$REPO_CREATED" = false ]; then
+    # Method 2: Use basic auth
+    RESPONSE=$(curl -s -X POST \
       "http://localhost:3000/api/v1/user/repos" \
       -u "$ADMIN_USER:$ADMIN_PASS" \
       -H "Content-Type: application/json" \
@@ -302,11 +315,20 @@ else
         "description": "Technical interview assignments",
         "private": false,
         "auto_init": true
-      }' || log "⚠️ Repository creation via basic auth failed"
+      }' 2>/dev/null || echo "")
+    
+    if echo "$RESPONSE" | grep -q '"name":"assignments"'; then
+        log "✅ Repository created via basic auth"
+        REPO_CREATED=true
+    fi
+fi
+
+if [ "$REPO_CREATED" = false ]; then
+    log "⚠️ Repository creation failed, will try push-to-create method"
 fi
 
 # Wait a bit for repository to be ready
-sleep 5
+sleep 10
 
 # Setup git in assignments folder and push to Gitea
 log "📂 Setting up assignments repository..."
@@ -328,21 +350,80 @@ git config user.name "$ADMIN_USER"
 git commit -m "Initial assignments setup" || echo "Commit might have failed"
 
 # Add remote and push
-git remote add origin "http://$ADMIN_USER:$ADMIN_PASS@localhost:3000/$ADMIN_USER/assignments.git" || echo "Remote might already exist"
-git push -u origin master || git push -u origin main || echo "Push might have failed"
+git remote add origin "http://$ADMIN_USER:$ADMIN_PASS@localhost:3000/$ADMIN_USER/assignments.git" 2>/dev/null || log "Remote might already exist"
+
+# Try to push to master first, then main
+if git push -u origin master 2>/dev/null; then
+    log "✅ Pushed to master branch"
+elif git push -u origin main 2>/dev/null; then
+    log "✅ Pushed to main branch"
+else
+    log "⚠️ Initial push failed, trying push-to-create..."
+    # This should work with ENABLE_PUSH_CREATE_USER = true
+    git push --set-upstream origin master 2>/dev/null || \
+    git push --set-upstream origin main 2>/dev/null || \
+    log "❌ All push attempts failed"
+fi
 
 # Clone assignments to admin user home directory
 log "📥 Cloning assignments to admin user home..."
-sudo -u "$ADMIN_USER" bash -c "
+
+# Wait a bit more for repository to be available
+sleep 5
+
+# Try cloning, if it fails, create assignments folder manually
+if sudo -u "$ADMIN_USER" bash -c "
   cd /home/$ADMIN_USER
-  git clone http://$ADMIN_USER:$ADMIN_PASS@localhost:3000/$ADMIN_USER/assignments.git
+  git clone http://$ADMIN_USER:$ADMIN_PASS@localhost:3000/$ADMIN_USER/assignments.git 2>/dev/null
+"; then
+    log "✅ Repository cloned successfully"
+else
+    log "⚠️ Repository clone failed, creating local assignments folder..."
+    sudo -u "$ADMIN_USER" bash -c "
+      cd /home/$ADMIN_USER
+      cp -r /root/tech-interview-service-de/assignments ./
+      cd assignments
+      git init
+      git remote add origin http://$ADMIN_USER:$ADMIN_PASS@localhost:3000/$ADMIN_USER/assignments.git
+      git config user.email '$ADMIN_USER@interview.local'
+      git config user.name '$ADMIN_USER'
+    "
+fi
+
+# Set global git config for admin user
+sudo -u "$ADMIN_USER" bash -c "
   git config --global user.email '$ADMIN_USER@interview.local'
   git config --global user.name '$ADMIN_USER'
 "
 
 # Setup code-server for admin user
 log "💻 Setting up code-server for $ADMIN_USER..."
-sudo -u "$ADMIN_USER" bash -c "curl -fsSL https://code-server.dev/install.sh | sh"
+
+# Install code-server via package manager to avoid sudo issues
+log "📦 Installing code-server from package..."
+curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix=/usr/local
+
+# Verify installation
+if [ ! -f "/usr/local/bin/code-server" ]; then
+    log "⚠️ Standalone installation failed, trying alternative method..."
+    # Alternative: download binary directly
+    ARCH=$(uname -m)
+    if [ "$ARCH" = "x86_64" ]; then
+        ARCH="amd64"
+    fi
+    
+    CODE_SERVER_VERSION="4.101.2"
+    wget -O /tmp/code-server.tar.gz "https://github.com/coder/code-server/releases/download/v${CODE_SERVER_VERSION}/code-server-${CODE_SERVER_VERSION}-linux-${ARCH}.tar.gz"
+    
+    cd /tmp
+    tar -xzf code-server.tar.gz
+    cp "code-server-${CODE_SERVER_VERSION}-linux-${ARCH}/bin/code-server" /usr/local/bin/
+    chmod +x /usr/local/bin/code-server
+    rm -rf /tmp/code-server*
+fi
+
+# Set ownership for admin user's code-server files
+chown -R "$ADMIN_USER:$ADMIN_USER" /home/"$ADMIN_USER"
 
 # Create code-server config directory
 mkdir -p /home/"$ADMIN_USER"/.config/code-server
@@ -367,7 +448,7 @@ After=network.target
 
 [Service]
 Type=exec
-ExecStart=/home/%i/.local/bin/code-server --config /home/%i/.config/code-server/config.yaml /home/%i/assignments
+ExecStart=/usr/local/bin/code-server --config /home/%i/.config/code-server/config.yaml /home/%i/assignments
 Restart=always
 User=%i
 Environment=HOME=/home/%i
