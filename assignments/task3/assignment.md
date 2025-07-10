@@ -8,7 +8,7 @@ Bring the raw trade data (trades.csv) to the **standard schema** below, remove d
 | `currency`      | ISO-4217 code of the trade currency (e.g. USD, EUR)                        |
 | `price_usd`     | Price converted to USD using the correct FX rate from fx_rates.csv (float) |
 | `quantity`      | Number of shares / contracts traded (float)                                |
-| `trade_time`    | Datetime of execution (`YYYY-MM-DD HH:MM:SS`, UTC)                         |
+| `trade_time`    | Datetime of execution (`YYYY-MM-DD HH:MM:SS`)                         |
 | `trader`        | Trader name, trimmed (cleaned from unnecessary whitespaces)                |
 | `sector`        | sector name (symbol_sector.csv)                                            |
 | `industry`      | industry name  (symbol_sector.csv)                                         |

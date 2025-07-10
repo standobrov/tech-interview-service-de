@@ -22,7 +22,7 @@ write_files:
       cd /root
       git clone https://github.com/standobrov/tech-interview-service-de.git
       cd tech-interview-service-de
-      chmod +x deploy_new.sh cleanup.sh
+      chmod +x deploy_new.sh
       
       # Run the full automated setup
       ./deploy_new.sh 2>&1 | tee /root/deployment.log
