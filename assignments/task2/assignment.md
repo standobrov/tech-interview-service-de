@@ -1,30 +1,37 @@
-Task: Maximum Aggregated Data Volume in a Sliding Time Window
+# Task 1: Data Cleaning and Processing
 
-You are given a list of events, where each event is represented as a dictionary with two keys:
-- 'timestamp': an integer representing the time in seconds when the event occurred
-- 'bytes': an integer representing the size of data (in bytes) transferred at that timestamp
+## Problem Statement
+You have been given a dataset of trading records that contains various data quality issues. Your task is to clean and standardize this data, then enrich it with exchange information.
 
-Your goal is to implement a function `max_bytes(events)`
-that returns the maximum total number of bytes transferred within any 5-second sliding window.
+## Input Files
+- `trades.csv` - Raw trading data with quality issues
+- `exchange_mapping.csv` - Mapping of stock symbols to exchanges
 
-The window is defined as a half-open interval [t, t + 5),
-meaning it includes events that occurred at time t but excludes events at time t + 5.
+## Your Task
+Create a script that
+1. Cleans and standardizes the trading data
+2. Maps each trade to its corresponding exchange
+3. Outputs clean, analysis-ready data
 
-Notes:
-- Events may not be sorted by timestamp.
-- Timestamps are positive integers.
-- There may be multiple events with the same timestamp.
+## Data Quality Issues
+You'll find various issues in the data that need to be addressed:
+- Inconsistent date formats
+- Price values with currency symbols and extra spaces
+- Missing values in various fields
+- Inconsistent text formatting (spacing, capitalization)
+- Duplicate records
 
-Example:
-```
-events = [
-    {"timestamp": 1, "bytes": 100},
-    {"timestamp": 2, "bytes": 50},
-    {"timestamp": 3, "bytes": 300},
-    {"timestamp": 6, "bytes": 10},
-    {"timestamp": 7, "bytes": 30},
-]
-```
 
-max_bytes(events) should return 450, since the window [1, 6) contains the first three events,
-with a total of 100 + 50 + 300 = 450 bytes.
+## Expected Deliverables
+- Clean CSV file with standardized data
+- Python script (you can use pandas)
+
+
+## Requirements
+Your solution should handle these core issues:
+- Clean date formats (convert to YYYY-MM-DD)
+- Remove currency symbols from prices ($)
+- Standardize trader names (proper case, trim spaces)
+- Normalize stock symbols (uppercase, trim)
+- Add exchange information from mapping file
+- Remove duplicates
