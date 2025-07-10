@@ -343,9 +343,10 @@ cd /root/tech-interview-service-de
 # Make sure assignments directory exists and has content
 if [ ! -d "assignments" ]; then
     log "⚠️ Creating assignments directory with task content..."
-    mkdir -p assignments/task1 assignments/task2
+    mkdir -p assignments/task1 assignments/task2 assignments/task3
     cp -r task1/* assignments/task1/ 2>/dev/null || echo "No task1 files to copy"
     cp -r task2/* assignments/task2/ 2>/dev/null || echo "No task2 files to copy"
+    cp -r task3/* assignments/task3/ 2>/dev/null || echo "No task3 files to copy"
 fi
 
 # Clone the existing repository from Gitea first (if it has content) or create locally
@@ -359,7 +360,7 @@ git init
 git add .
 git config user.email "$ADMIN_USER@interview.local"
 git config user.name "$ADMIN_USER"
-git commit -m "Add technical interview assignments (task1 and task2)" || log "⚠️ Commit might have failed"
+git commit -m "Add technical interview assignments" || log "⚠️ Commit might have failed"
 
 # Add remote and push
 git remote add origin "http://$ADMIN_USER:$ADMIN_PASS@localhost:3000/$ADMIN_USER/assignments.git" 2>/dev/null || log "Remote might already exist"
