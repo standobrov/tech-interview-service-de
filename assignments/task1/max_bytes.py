@@ -50,37 +50,3 @@ events = [
     {"timestamp": 53, "bytes": 245},
     {"timestamp": 18, "bytes": 115},
 ]
-
-from collections import deque
-
-def max_bytes(events):
-    # Sort events by timestamp
-    events.sort(key=lambda x: x['timestamp'])
-
-    window = deque()
-    current_sum = 0
-    max_sum = 0
-
-    for event in events:
-        t = event['timestamp']
-        b = event['bytes']
-
-        # Remove events outside the window [t-4, t]
-        while window and window[0]['timestamp'] < t - 4:
-            removed = window.popleft()
-            current_sum -= removed['bytes']
-
-        # Add current event
-        window.append(event)
-        current_sum += b
-
-        # Update maximum
-        max_sum = max(max_sum, current_sum)
-
-    return max_sum
-
-
-print(max_bytes(events))  # Output: 450
-
-
-print(max_bytes(events))
